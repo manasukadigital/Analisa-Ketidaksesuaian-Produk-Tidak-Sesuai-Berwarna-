@@ -1,0 +1,5 @@
+{
+  "name": " Analisa Ketidaksesuaian Produk Tidak Sesuai (Berwarna)",
+  "description": "A form to create a new corrective action case, with fields for case details, description, and evidence upload.",
+  "requestFramePermissions": []
+}
