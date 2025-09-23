@@ -175,6 +175,7 @@ const NewCaseForm = () => {
   const [activeRcaMethod, setActiveRcaMethod] = useState<RcaMethod>('fishbone');
   const [activeFishboneCategories, setActiveFishboneCategories] = useState<FishboneCategory[]>([]);
   const [fiveWhyAnalyses, setFiveWhyAnalyses] = useState<FiveWhyAnalysis[]>([]);
+  const [selectedRootCauses, setSelectedRootCauses] = useState<string[]>([]);
   
   // Action Plan State
   const [containmentActions, setContainmentActions] = useState<ContainmentAction[]>([]);
@@ -291,10 +292,25 @@ const NewCaseForm = () => {
       }));
   };
 
+  const toggleRootCause = (causeText: string) => {
+    setSelectedRootCauses(prev => 
+        prev.includes(causeText) 
+            ? prev.filter(c => c !== causeText) 
+            : [...prev, causeText]
+    );
+  };
+
 
   // --- Handlers for Action Plan ---
   const addContainmentAction = () => {
-    const newAction: ContainmentAction = { id: Date.now(), rootCauseReference: '', action: '', pic: '', dueDate: '', status: 'Belum Mulai' };
+    const newAction: ContainmentAction = { 
+      id: Date.now(), 
+      rootCauseReference: selectedRootCauses.length === 1 ? selectedRootCauses[0] : '', 
+      action: '', 
+      pic: '', 
+      dueDate: '', 
+      status: 'Belum Mulai' 
+    };
     setContainmentActions(prev => [...prev, newAction]);
   };
 
@@ -307,7 +323,16 @@ const NewCaseForm = () => {
   };
 
   const addPreventiveAction = () => {
-      const newAction: PreventiveAction = { id: Date.now(), rootCauseReference: '', action: '', pic: '', reviewer: '', dueDate: '', priority: 'Sedang', riskRating: 'Sedang' };
+      const newAction: PreventiveAction = { 
+        id: Date.now(), 
+        rootCauseReference: selectedRootCauses.length === 1 ? selectedRootCauses[0] : '', 
+        action: '', 
+        pic: '', 
+        reviewer: '', 
+        dueDate: '', 
+        priority: 'Sedang', 
+        riskRating: 'Sedang' 
+      };
       setPreventiveActions(prev => [...prev, newAction]);
   };
 
@@ -838,6 +863,7 @@ const NewCaseForm = () => {
     setContainmentActions([]);
     setPreventiveActions([]);
     setActiveRcaMethod('fishbone');
+    setSelectedRootCauses([]);
     setAiError('');
     setEnhancingField(null);
     setIsAiSuggesting(null);
@@ -867,21 +893,6 @@ const NewCaseForm = () => {
     });
     return causes;
   }, [activeFishboneCategories]);
-  
-  const identifiedRootCauses = useMemo(() => {
-    const allCauses: string[] = [];
-    fiveWhyAnalyses.forEach((analysis, analysisIndex) => {
-      if (analysis.initialCause && analysis.initialCause.trim() !== '') {
-        allCauses.push(`[Analisis #${analysisIndex + 1}] Why #1: ${analysis.initialCause}`);
-      }
-      analysis.whys.forEach((why, whyIndex) => {
-        if (why && why.trim() !== '') {
-          allCauses.push(`[Analisis #${analysisIndex + 1}] Why #${whyIndex + 2}: ${why}`);
-        }
-      });
-    });
-    return allCauses;
-  }, [fiveWhyAnalyses]);
 
   // --- Render Method ---
   return (
@@ -1095,7 +1106,10 @@ const NewCaseForm = () => {
                   )}
                   {activeRcaMethod === '5why' && (
                       <div id="5why-analysis">
-                        {fiveWhyAnalyses.map((analysis, analysisIndex) => (
+                        {fiveWhyAnalyses.map((analysis, analysisIndex) => {
+                            const initialCauseText = `[Analisis #${analysisIndex + 1}] Why #1: ${analysis.initialCause}`;
+                            const isInitialCauseSelected = selectedRootCauses.includes(initialCauseText);
+                            return (
                           <div key={analysis.id} className="five-why-analysis-block">
                             <div className="five-why-analysis-header">
                               <h4>Analisis 5 Why #{analysisIndex + 1}</h4>
@@ -1108,7 +1122,7 @@ const NewCaseForm = () => {
                             </div>
 
                             <div className="five-whys-container">
-                              <div className="form-group">
+                              <div className={`form-group ${isInitialCauseSelected ? 'root-cause-selected' : ''}`}>
                                 <label htmlFor={`why-1-${analysis.id}`}>
                                   Why #1 (Pilih dari Fishbone)
                                   <span className="tooltip-icon" data-tooltip="Pilih penyebab paling relevan dari Diagram Fishbone sebagai titik awal analisis 5 Why.">i</span>
@@ -1130,13 +1144,24 @@ const NewCaseForm = () => {
                                     </option>
                                   ))}
                                 </select>
+                                {analysis.initialCause && (
+                                    <button
+                                        type="button"
+                                        className={`mark-root-cause-btn ${isInitialCauseSelected ? 'selected' : ''}`}
+                                        onClick={() => toggleRootCause(initialCauseText)}
+                                    >
+                                        {isInitialCauseSelected ? '✓ Akar Masalah' : '🚩 Jadikan Akar Masalah'}
+                                    </button>
+                                )}
                               </div>
                               
                               {analysis.whys.map((why, whyIndex) => {
                                   const fieldId = `5why-${analysis.id}-${whyIndex}`;
                                   const prevWhy = whyIndex === 0 ? analysis.initialCause : analysis.whys[whyIndex - 1];
+                                  const whyText = `[Analisis #${analysisIndex + 1}] Why #${whyIndex + 2}: ${why}`;
+                                  const isSelected = selectedRootCauses.includes(whyText);
                                   return (
-                                  <div key={whyIndex} className="form-group">
+                                  <div key={whyIndex} className={`form-group ${isSelected ? 'root-cause-selected' : ''}`}>
                                       <label htmlFor={`why-${whyIndex+2}-${analysis.id}`}>Why #{whyIndex+2}</label>
                                       <div className="input-with-enhance">
                                         <textarea 
@@ -1163,13 +1188,23 @@ const NewCaseForm = () => {
                                             <button type="button" className="remove-why-btn" onClick={() => removeFiveWhy(analysis.id, whyIndex)} title="Hapus Why">×</button>
                                         </div>
                                       </div>
+                                       {why && (
+                                            <button
+                                                type="button"
+                                                className={`mark-root-cause-btn ${isSelected ? 'selected' : ''}`}
+                                                onClick={() => toggleRootCause(whyText)}
+                                            >
+                                                {isSelected ? '✓ Akar Masalah' : '🚩 Jadikan Akar Masalah'}
+                                            </button>
+                                        )}
                                   </div>
                                   );
                               })}
                               {analysis.initialCause && <button type="button" className="add-why-btn-inline" onClick={() => addFiveWhy(analysis.id)}>+ Tambah Why</button>}
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                         <button type="button" className="add-analysis-btn" onClick={addFiveWhyAnalysis}>+ Tambah Analisis 5 Why Baru</button>
                       </div>
                   )}
@@ -1201,10 +1236,10 @@ const NewCaseForm = () => {
                                       id={`containment-cause-${item.id}`}
                                       value={item.rootCauseReference}
                                       onChange={(e) => handleContainmentChange(item.id, 'rootCauseReference', e.target.value)}
-                                      disabled={identifiedRootCauses.length === 0}
+                                      disabled={selectedRootCauses.length === 0}
                                   >
-                                      <option value="">{identifiedRootCauses.length === 0 ? 'Selesaikan Analisis 5 Why dahulu' : '-- Pilih Akar Masalah --'}</option>
-                                      {identifiedRootCauses.map((cause, index) => (
+                                      <option value="">{selectedRootCauses.length === 0 ? 'Tandai Akar Masalah dari 5 Why dahulu' : '-- Pilih Akar Masalah --'}</option>
+                                      {selectedRootCauses.map((cause, index) => (
                                           <option key={index} value={cause}>{cause}</option>
                                       ))}
                                   </select>
@@ -1272,10 +1307,10 @@ const NewCaseForm = () => {
                                       id={`capa-cause-${item.id}`}
                                       value={item.rootCauseReference}
                                       onChange={(e) => handlePreventiveChange(item.id, 'rootCauseReference', e.target.value)}
-                                      disabled={identifiedRootCauses.length === 0}
+                                      disabled={selectedRootCauses.length === 0}
                                   >
-                                      <option value="">{identifiedRootCauses.length === 0 ? 'Selesaikan Analisis 5 Why dahulu' : '-- Pilih Akar Masalah --'}</option>
-                                      {identifiedRootCauses.map((cause, index) => (
+                                      <option value="">{selectedRootCauses.length === 0 ? 'Tandai Akar Masalah dari 5 Why dahulu' : '-- Pilih Akar Masalah --'}</option>
+                                      {selectedRootCauses.map((cause, index) => (
                                           <option key={index} value={cause}>{cause}</option>
                                       ))}
                                   </select>

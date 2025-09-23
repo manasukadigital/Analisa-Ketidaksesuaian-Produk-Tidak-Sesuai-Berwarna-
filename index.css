@@ -546,6 +546,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     gap: 1.5rem;
 }
 
+.mark-root-cause-btn {
+    align-self: flex-start;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background-color: transparent;
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+}
+
+.mark-root-cause-btn:hover {
+    border-color: var(--glass-border-hover);
+    color: var(--text-primary);
+}
+
+.mark-root-cause-btn.selected {
+    background: linear-gradient(90deg, #10b981, #06b6d4);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.root-cause-selected {
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: -1rem; /* counteract padding to prevent layout shift */
+    background-color: rgba(16, 185, 129, 0.1);
+    transition: all 0.3s;
+}
+
 /* Action Plan Styles */
 .subsection { margin-top: 2rem; }
 
