@@ -183,10 +183,19 @@ body::before {
   font-family: 'Inter', sans-serif;
 }
 
-.form-group select option {
+/* Fix for dropdown option visibility */
+.app-container select option {
     background-color: var(--background-end);
     color: var(--text-primary);
 }
+
+/* This specifically styles the category group labels like "Manajemen Umum" */
+.app-container select optgroup {
+    background-color: #1e293b; /* A dark slate color */
+    color: var(--text-heading);
+    font-weight: bold;
+}
+
 
 .form-group input:focus,
 .form-group select:focus,
@@ -259,17 +268,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     bottom: 140%;
     left: 50%;
     transform: translateX(-50%);
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
     border-radius: 6px;
     background-color: #020617;
     border: 1px solid var(--glass-border);
     color: white;
     font-size: 0.875rem;
-    line-height: 1.25;
+    line-height: 1.4;
     font-weight: 400;
     font-style: normal;
     font-family: 'Inter', sans-serif;
-    white-space: nowrap;
+    white-space: pre-line;
+    max-width: 500px;
+    text-align: left;
     z-index: 10;
     visibility: hidden;
     opacity: 0;
@@ -417,31 +428,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* --- AI & Interaction Buttons --- */
 
-.ai-btn {
-    background: linear-gradient(90deg, var(--ai-btn-color), var(--secondary-color));
-    color: #ffffff;
-    font-weight: 600;
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 0 15px rgba(34, 211, 238, 0.3);
-}
-
-.ai-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0 25px rgba(34, 211, 238, 0.5);
-}
-
-.ai-btn:disabled {
-    background: #475569;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
 .input-with-enhance {
   position: relative;
   width: 100%;
@@ -449,6 +435,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .input-with-enhance textarea { padding-right: 40px; }
 .five-whys-container .input-with-enhance textarea { padding-right: 95px; }
+.action-item .input-with-enhance textarea { padding-right: 70px; }
+
 
 .input-buttons {
     position: absolute;
@@ -576,6 +564,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: var(--text-primary);
 }
 
+.subsection-header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
 .add-action-btn {
     background-color: transparent;
     color: var(--primary-color);
@@ -585,6 +579,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border-radius: 6px;
     cursor: pointer;
     transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
 }
 
 .add-action-btn:hover {

@@ -181,7 +181,6 @@ const NewCaseForm = () => {
   const [preventiveActions, setPreventiveActions] = useState<PreventiveAction[]>([]);
 
   // UI State
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [enhancingField, setEnhancingField] = useState<string | null>(null);
   const [isAiSuggesting, setIsAiSuggesting] = useState<string | null>(null);
@@ -406,7 +405,7 @@ const NewCaseForm = () => {
       }
   };
 
-  // --- Row-by-row AI RCA Suggestions ---
+  // --- Row-by-row AI RCA & Action Suggestions ---
 
   const getAiFishboneCauseSuggestion = async (categoryId: number) => {
     const category = activeFishboneCategories.find(c => c.id === categoryId);
@@ -429,7 +428,7 @@ const NewCaseForm = () => {
         const existingCauses = category.causes.join(', ');
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: `Bertindak sebagai ahli rekayasa kualitas. Untuk masalah "${formData.description}", berikan satu kemungkinan akar penyebab spesifik untuk kategori '${categoryName}'. Penyebab yang sudah ada untuk kategori ini: [${existingCauses}]. Berikan HANYA satu penyebab baru, singkat, dan jelas dalam Bahasa Indonesia. Jangan ulangi penyebab yang sudah ada. Berikan jawaban dalam bentuk kalimat pendek.`,
+            contents: `Bertindak sebagai ahli rekayasa kualitas. Untuk masalah "${formData.description}", berikan satu kemungkinan akar penyebab spesifik untuk kategori '${categoryName}'. Penyebab yang sudah ada untuk kategori ini: [${existingCauses}]. Berikan HONLY satu penyebab baru, singkat, dan jelas dalam Bahasa Indonesia. Jangan ulangi penyebab yang sudah ada. Berikan jawaban dalam bentuk kalimat pendek.`,
         });
         const newCause = response.text.trim();
         if (newCause) {
@@ -490,92 +489,55 @@ const NewCaseForm = () => {
         setIsAiSuggesting(null);
     }
   };
-
-
-  const getAiActionPlanSuggestion = async () => {
-     if (!formData.description) {
-      alert('Mohon isi "Deskripsi Masalah" terlebih dahulu.');
-      return;
-    }
-
-    const rootCauses = fiveWhyAnalyses
-        .map(analysis => [...analysis.whys].filter(w => w.trim() !== '').pop())
-        .filter((value): value is string => Boolean(value));
-
-    if (activeRcaMethod === '5why' && rootCauses.length === 0) {
-        alert('Mohon selesaikan setidaknya satu alur analisis 5 Why untuk mendapatkan saran Rencana Tindakan.');
-        return;
-    }
-    
-    // Default to Fishbone if no 5 why analysis is done
-    const rcaContext = activeRcaMethod === '5why' && rootCauses.length > 0
-      ? `Akar masalah yang teridentifikasi melalui metode 5 Why adalah: [${rootCauses.join('; ')}]`
-      : `Hasil analisis Fishbone: ${JSON.stringify(activeFishboneCategories.map(c => ({ category: c.name, causes: c.causes })))}`;
-    
-    const rootCausesForPrompt = rootCauses.length > 0 ? rootCauses : ["Penyebab umum berdasarkan analisis Fishbone"];
-
-    setIsAiLoading(true);
-    setAiError('');
-
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Bertindak sebagai manajer kualitas ahli. Masalah: "${formData.description}". Akar masalah yang teridentifikasi: ${JSON.stringify(rootCausesForPrompt)}. 
-        Untuk setiap akar masalah, sarankan rencana tindakan SMART dalam Bahasa Indonesia.
-        - 1-2 'containment' (koreksi segera, jika relevan).
-        - 2-3 'capa' (tindakan korektif jangka panjang).
-        Pastikan setiap tindakan secara eksplisit mereferensikan akar masalah yang ditanganinya.`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              containment: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    action: { type: Type.STRING },
-                    pic: { type: Type.STRING, description: "Sarankan peran, misal: 'Supervisor Produksi'" },
-                    dueDate: { type: Type.STRING, description: "Sarankan batas waktu singkat, misal: '3 hari'" },
-                    rootCauseReference: { type: Type.STRING, description: "Kutip dengan TEPAT salah satu akar masalah dari daftar yang diberikan yang ditangani oleh tindakan ini." }
-                  }
-                }
-              },
-              capa: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    action: { type: Type.STRING },
-                    pic: { type: Type.STRING, description: "Sarankan peran, misal: 'Manajer Kualitas'" },
-                    reviewer: { type: Type.STRING, description: "Sarankan peran, misal: 'Kepala Pabrik'" },
-                    dueDate: { type: Type.STRING, description: "Sarankan batas waktu panjang, misal: '4 minggu'" },
-                    priority: { type: Type.STRING, description: "Rendah, Sedang, atau Tinggi" },
-                    riskRating: { type: Type.STRING, description: "Rendah, Sedang, atau Tinggi" },
-                    rootCauseReference: { type: Type.STRING, description: "Kutip dengan TEPAT salah satu akar masalah dari daftar yang diberikan yang ditangani oleh tindakan ini." }
-                  }
-                }
-              }
-            }
-          }
+  
+    const getAiSingleActionSuggestion = async (actionType: 'containment' | 'capa', actionId: number) => {
+        if (!formData.description) {
+            alert('Mohon isi "Deskripsi Masalah" terlebih dahulu.');
+            return;
         }
-      });
 
-      const result = JSON.parse(response.text);
-      const suggestedContainment = result.containment.map((a: any) => ({ ...a, id: Date.now() + Math.random(), status: 'Belum Mulai' }));
-      const suggestedCapa = result.capa.map((a: any) => ({ ...a, id: Date.now() + Math.random() }));
+        const rootCauses = fiveWhyAnalyses
+            .map(analysis => [...analysis.whys].filter(w => w.trim() !== '').pop())
+            .filter((value): value is string => Boolean(value));
 
-      setContainmentActions(suggestedContainment);
-      setPreventiveActions(suggestedCapa);
+        if (activeRcaMethod === '5why' && rootCauses.length === 0) {
+            alert('Mohon selesaikan setidaknya satu alur analisis 5 Why untuk mendapatkan saran.');
+            return;
+        }
+        
+        const rootCausesForPrompt = rootCauses.length > 0 ? rootCauses : ["Penyebab umum berdasarkan analisis Fishbone"];
+        
+        const fieldId = `${actionType}-${actionId}`;
+        setIsAiSuggesting(fieldId);
+        setAiError('');
 
-    } catch (error) {
-       console.error("Error fetching Action Plan suggestions:", error);
-       setAiError('Gagal mendapatkan saran AI untuk Rencana Tindakan. Silakan coba lagi.');
-    } finally {
-       setIsAiLoading(false);
-    }
-  };
+        const promptText = `Bertindak sebagai manajer kualitas ahli. Untuk masalah: "${formData.description}", dan berdasarkan akar masalah: ${JSON.stringify(rootCausesForPrompt)}, 
+        Sarankan SATU tindakan ${actionType === 'containment' ? 'koreksi segera (containment)' : 'korektif dan preventif (CAPA)'} yang SMART dan spesifik dalam Bahasa Indonesia.
+        Berikan HANYA teks tindakan yang disarankan, tanpa awalan seperti "Tindakan:", penjelasan, atau format tambahan.`;
+
+        try {
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: promptText,
+            });
+
+            const suggestedActionText = response.text.trim();
+            
+            if (suggestedActionText) {
+                if (actionType === 'containment') {
+                    handleContainmentChange(actionId, 'action', suggestedActionText);
+                } else { // 'capa'
+                    handlePreventiveChange(actionId, 'action', suggestedActionText);
+                }
+            }
+        } catch (error) {
+            console.error(`Error fetching single ${actionType} suggestion:`, error);
+            setAiError(`Gagal mendapatkan saran AI untuk tindakan ini. Silakan coba lagi.`);
+        } finally {
+            setIsAiSuggesting(null);
+        }
+    };
+
 
   const getFullReportData = () => {
     return {
@@ -865,7 +827,6 @@ const NewCaseForm = () => {
     setContainmentActions([]);
     setPreventiveActions([]);
     setActiveRcaMethod('fishbone');
-    setIsAiLoading(false);
     setAiError('');
     setEnhancingField(null);
     setIsAiSuggesting(null);
@@ -928,8 +889,8 @@ const NewCaseForm = () => {
           </svg>
         </div>
         <div className="header-text">
-            <h1>Corrective Action Studio</h1>
-            <p>Root Cause Analysis & Action Plan Generator</p>
+            <h1>Tindakan Perbaikan</h1>
+            <p>Ketidaksesuaian Produk, Klaim dan Komplain Pelanggan</p>
         </div>
       </header>
       <main className="form-container">
@@ -938,10 +899,10 @@ const NewCaseForm = () => {
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="referenceNumber">
-                  No Refrensi
+                  Nomor Referensi
                   <span className="tooltip-icon" data-tooltip="Masukkan nomor referensi unik untuk kasus ini.">i</span>
               </label>
-              <input type="text" id="referenceNumber" name="referenceNumber" value={formData.referenceNumber} onChange={handleInputChange} placeholder="Contoh: NC-2024-001" required />
+              <input type="text" id="referenceNumber" name="referenceNumber" value={formData.referenceNumber} onChange={handleInputChange} placeholder="contoh : 18/TCP/MR-05/VIII/2025" required />
             </div>
             <div className="form-group">
               <label htmlFor="date">
@@ -955,21 +916,21 @@ const NewCaseForm = () => {
                   Lokasi
                   <span className="tooltip-icon" data-tooltip="Lokasi spesifik di mana masalah terjadi (misal: Gudang, Line Produksi A).">i</span>
               </label>
-              <input type="text" id="location" name="location" value={formData.location} onChange={handleInputChange} placeholder="Contoh: Area Produksi B" required />
+              <input type="text" id="location" name="location" value={formData.location} onChange={handleInputChange} placeholder="contoh: Bagian Printing" required />
             </div>
             <div className="form-group">
               <label htmlFor="customerDesign">
-                  Pelanggan/No, Design
+                  Pelanggan No Design
                   <span className="tooltip-icon" data-tooltip="Nama pelanggan dan nomor atau nama desain produk yang terkait.">i</span>
               </label>
-              <input type="text" id="customerDesign" name="customerDesign" value={formData.customerDesign} onChange={handleInputChange} placeholder="Contoh: PT ABC / Desain X-1" required />
+              <input type="text" id="customerDesign" name="customerDesign" value={formData.customerDesign} onChange={handleInputChange} placeholder="Contoh : LajuSarana 12356/4" required />
             </div>
             <div className="form-group">
               <label htmlFor="salesOrderNumber">
                   No. SO
                   <span className="tooltip-icon" data-tooltip="Nomor Sales Order yang berhubungan dengan produk terdampak.">i</span>
               </label>
-              <input type="text" id="salesOrderNumber" name="salesOrderNumber" value={formData.salesOrderNumber} onChange={handleInputChange} placeholder="Contoh: SO-12345" required />
+              <input type="text" id="salesOrderNumber" name="salesOrderNumber" value={formData.salesOrderNumber} onChange={handleInputChange} placeholder="Contoh: 1-022025-00215" required />
             </div>
             <div className="form-group">
               <label htmlFor="quantity">
@@ -981,7 +942,7 @@ const NewCaseForm = () => {
             <div className="form-group full-width">
               <label htmlFor="severity">
                   Tingkat Keparahan (Severity)
-                  <span className="tooltip-icon" data-tooltip="Pilih tingkat dampak masalah terhadap kualitas atau keamanan.">i</span>
+                  <span className="tooltip-icon" data-tooltip={`Definisi Tingkat Keparahan:\n\n• Rendah: Dampak minor pada penampilan atau fungsi non-esensial. Tidak menyebabkan penolakan produk.\n\n• Sedang: Mempengaruhi fungsi produk, memerlukan perbaikan atau rework, namun tidak menyebabkan bahaya.\n\n• Tinggi: Kegagalan fungsi utama, kerusakan signifikan, atau isu yang pasti menyebabkan keluhan pelanggan.\n\n• Kritis: Pelanggaran keamanan, regulasi, atau hukum. Dapat menyebabkan cedera, kerusakan properti, atau penghentian total produksi.`}>i</span>
               </label>
               <select id="severity" name="severity" value={formData.severity} onChange={handleInputChange} required>
                 <option value="Low">Rendah</option>
@@ -1035,7 +996,7 @@ const NewCaseForm = () => {
                   </button>
               </div>
               <div className="rca-content">
-                  {isAiLoading && <div className="loading-overlay"><span>AI sedang berpikir...</span></div>}
+                  {isAiSuggesting && <div className="loading-overlay"><span>AI sedang berpikir...</span></div>}
                   {aiError && <div className="ai-error">{aiError}</div>}
                   {activeRcaMethod === 'fishbone' && (
                       <div id="fishbone-analysis">
@@ -1200,21 +1161,14 @@ const NewCaseForm = () => {
               <header className="section-header">
                   <h2>Rencana Tindakan (Action Plan)</h2>
               </header>
-              <button 
-                type="button" 
-                className="ai-btn" 
-                onClick={getAiActionPlanSuggestion} 
-                disabled={isAiLoading || (activeRcaMethod === '5why' && identifiedRootCauses.length === 0)}
-                title={activeRcaMethod === '5why' && identifiedRootCauses.length === 0 ? "Selesaikan analisis 5 Why terlebih dahulu" : "Sarankan rencana tindakan berdasarkan akar masalah"}
-              >
-                [AI Suggestion] Sarankan Seluruh Rencana Tindakan
-              </button>
 
               {/* Containment Actions */}
               <div className="subsection">
                   <div className="subsection-header">
                       <h3>Koreksi</h3>
-                      <button type="button" className="add-action-btn" onClick={addContainmentAction}>+ Tambah Tindakan</button>
+                       <div className="subsection-header-actions">
+                          <button type="button" className="add-action-btn" onClick={addContainmentAction}>+ Tambah Tindakan</button>
+                       </div>
                   </div>
                   <div className="action-list">
                       {containmentActions.map((item) => {
@@ -1240,7 +1194,16 @@ const NewCaseForm = () => {
                                 <div className="input-with-enhance">
                                   <textarea id={`containment-action-${item.id}`} value={item.action} onChange={(e) => handleContainmentChange(item.id, 'action', e.target.value)} placeholder="Deskripsi tindakan..." rows={2}></textarea>
                                   <div className="input-buttons">
-                                    <button type="button" className="enhance-btn" onClick={() => handleEnhanceContainment(item.id)} disabled={enhancingField === fieldId} title="Sempurnakan dengan AI">
+                                    <button
+                                        type="button"
+                                        className="ai-suggest-btn"
+                                        onClick={() => getAiSingleActionSuggestion('containment', item.id)}
+                                        disabled={isAiSuggesting === fieldId}
+                                        title="Sarankan tindakan (AI)"
+                                    >
+                                        {isAiSuggesting === fieldId ? '...' : '🧠'}
+                                    </button>
+                                    <button type="button" className="enhance-btn" onClick={() => handleEnhanceContainment(item.id)} disabled={enhancingField === fieldId || !item.action} title="Sempurnakan dengan AI">
                                         {enhancingField === fieldId ? '...' : '✨'}
                                     </button>
                                   </div>
@@ -1274,7 +1237,9 @@ const NewCaseForm = () => {
               <div className="subsection">
                   <div className="subsection-header">
                       <h3>Tindakan Korektif</h3>
-                      <button type="button" className="add-action-btn" onClick={addPreventiveAction}>+ Tambah Tindakan</button>
+                      <div className="subsection-header-actions">
+                          <button type="button" className="add-action-btn" onClick={addPreventiveAction}>+ Tambah Tindakan</button>
+                      </div>
                   </div>
                   <div className="action-list">
                       {preventiveActions.map((item) => {
@@ -1300,7 +1265,16 @@ const NewCaseForm = () => {
                                   <div className="input-with-enhance">
                                   <textarea id={`capa-action-${item.id}`} value={item.action} onChange={(e) => handlePreventiveChange(item.id, 'action', e.target.value)} placeholder="Deskripsi tindakan..." rows={3}></textarea>
                                   <div className="input-buttons">
-                                    <button type="button" className="enhance-btn" onClick={() => handleEnhancePreventive(item.id)} disabled={enhancingField === fieldId} title="Sempurnakan dengan AI">
+                                    <button
+                                        type="button"
+                                        className="ai-suggest-btn"
+                                        onClick={() => getAiSingleActionSuggestion('capa', item.id)}
+                                        disabled={isAiSuggesting === fieldId}
+                                        title="Sarankan tindakan (AI)"
+                                    >
+                                        {isAiSuggesting === fieldId ? '...' : '🧠'}
+                                    </button>
+                                    <button type="button" className="enhance-btn" onClick={() => handleEnhancePreventive(item.id)} disabled={enhancingField === fieldId || !item.action} title="Sempurnakan dengan AI">
                                         {enhancingField === fieldId ? '...' : '✨'}
                                     </button>
                                   </div>
