@@ -491,29 +491,40 @@ const NewCaseForm = () => {
   };
   
     const getAiSingleActionSuggestion = async (actionType: 'containment' | 'capa', actionId: number) => {
+        const action = actionType === 'containment'
+            ? containmentActions.find(a => a.id === actionId)
+            : preventiveActions.find(a => a.id === actionId);
+
+        if (!action) return;
+
+        const selectedRootCause = action.rootCauseReference;
+        
+        if (!selectedRootCause) {
+            alert('Mohon pilih "Referensi Akar Masalah" terlebih dahulu untuk mendapatkan saran yang relevan.');
+            return;
+        }
+        
         if (!formData.description) {
             alert('Mohon isi "Deskripsi Masalah" terlebih dahulu.');
             return;
         }
 
-        const rootCauses = fiveWhyAnalyses
-            .map(analysis => [...analysis.whys].filter(w => w.trim() !== '').pop())
-            .filter((value): value is string => Boolean(value));
-
-        if (activeRcaMethod === '5why' && rootCauses.length === 0) {
-            alert('Mohon selesaikan setidaknya satu alur analisis 5 Why untuk mendapatkan saran.');
-            return;
-        }
-        
-        const rootCausesForPrompt = rootCauses.length > 0 ? rootCauses : ["Penyebab umum berdasarkan analisis Fishbone"];
-        
         const fieldId = `${actionType}-${actionId}`;
         setIsAiSuggesting(fieldId);
         setAiError('');
 
-        const promptText = `Bertindak sebagai manajer kualitas ahli. Untuk masalah: "${formData.description}", dan berdasarkan akar masalah: ${JSON.stringify(rootCausesForPrompt)}, 
-        Sarankan SATU tindakan ${actionType === 'containment' ? 'koreksi segera (containment)' : 'korektif dan preventif (CAPA)'} yang SMART dan spesifik dalam Bahasa Indonesia.
-        Berikan HANYA teks tindakan yang disarankan, tanpa awalan seperti "Tindakan:", penjelasan, atau format tambahan.`;
+        let promptText = '';
+        if (actionType === 'containment') {
+            promptText = `Bertindak sebagai manajer kualitas. Masalahnya adalah: "${formData.description}". Akar masalah yang terkait adalah: "${selectedRootCause}". 
+            Sarankan SATU tindakan KOREKSI SEGERA (containment action) yang spesifik untuk mengisolasi dan mengatasi dampak langsung dari masalah ini. Fokus pada penahanan masalah, bukan pencegahan jangka panjang.
+            Berikan HANYA teks tindakan yang disarankan, dalam Bahasa Indonesia, tanpa awalan atau penjelasan.`;
+        } else { // 'capa'
+            promptText = `Bertindak sebagai ahli Corrective Action Preventive Action (CAPA). Masalah awal adalah: "${formData.description}". 
+            Fokus utama pada akar penyebab berikut: "${selectedRootCause}".
+            Sarankan SATU tindakan KOREKTIF DAN PREVENTIF yang SMART (Specific, Measurable, Achievable, Relevant, Time-bound) untuk menghilangkan akar penyebab ini dan mencegahnya terjadi lagi.
+            Berikan HANYA teks tindakan yang disarankan, dalam Bahasa Indonesia, tanpa awalan atau penjelasan.`;
+        }
+
 
         try {
             const response = await ai.models.generateContent({
@@ -858,9 +869,18 @@ const NewCaseForm = () => {
   }, [activeFishboneCategories]);
   
   const identifiedRootCauses = useMemo(() => {
-     return fiveWhyAnalyses
-        .map(analysis => [...analysis.whys].filter(w => w.trim() !== '').pop())
-        .filter((value): value is string => Boolean(value));
+    const allCauses: string[] = [];
+    fiveWhyAnalyses.forEach((analysis, analysisIndex) => {
+      if (analysis.initialCause && analysis.initialCause.trim() !== '') {
+        allCauses.push(`[Analisis #${analysisIndex + 1}] Why #1: ${analysis.initialCause}`);
+      }
+      analysis.whys.forEach((why, whyIndex) => {
+        if (why && why.trim() !== '') {
+          allCauses.push(`[Analisis #${analysisIndex + 1}] Why #${whyIndex + 2}: ${why}`);
+        }
+      });
+    });
+    return allCauses;
   }, [fiveWhyAnalyses]);
 
   // --- Render Method ---
